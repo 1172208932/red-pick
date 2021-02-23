@@ -1,1 +1,0 @@
-{"type":"View","props":{"width":525,"runtime":"script/compoments/Plant.ts","height":54},"compId":2,"child":[{"type":"Sprite","props":{"texture":"game/backprogress.png"},"compId":3},{"type":"Sprite","props":{"y":-22.5,"x":14,"texture":"game/barprogress.png"},"compId":4}],"loadList":["game/backprogress.png","game/barprogress.png"],"loadList3D":[]}

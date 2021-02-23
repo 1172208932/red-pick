@@ -1,1 +1,0 @@
-{"type":"Dialog","props":{"width":640,"runtime":"script/dialog/ReadyDialog.ts","isModal":true,"height":1136},"compId":2,"child":[{"type":"Sprite","props":{"y":466,"x":245,"texture":"test/iconlbl_3.png"},"compId":3}],"loadList":["test/iconlbl_3.png"],"loadList3D":[]}
