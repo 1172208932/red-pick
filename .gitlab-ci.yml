@@ -1,0 +1,93 @@
+#red-envelope.mockuai.com
+#https://gitlab.mockuai.com/f2e/game/red-envelope
+#online
+
+variables:
+  REMOTE: 'openresty-web'
+  DOMAIN: 'red-envelope.mockuai.com'
+  DEPLOY_DOCUMENT: "/mnt/openresty/html/${DOMAIN}"
+  BACKUP_DOCUMENT: "/mnt/openresty/html/history/${DOMAIN}"
+
+
+stages:
+  - build
+  - package
+  - transfer
+  - check
+  - decompress
+  - hijack_dns
+  - deploy
+  - release_dns
+
+build:
+  stage: build
+  only:
+    - online
+  script:
+    - mkdir -p /tmp/${CI_PROJECT_NAME}/${CI_PIPELINE_ID}
+    - ssh web11 "test -d /home/admin/www/${DOMAIN} || mkdir -p /home/admin/www/${DOMAIN}"
+    - scp -r release/web/* web11:/home/admin/www/${DOMAIN}
+    - mv release/web /tmp/${CI_PROJECT_NAME}/${CI_PIPELINE_ID}/
+    - echo '编译完成，等待打包......'
+
+package:
+  stage: package
+  only:
+    - online
+  script:
+    - cd /tmp/${CI_PROJECT_NAME}/${CI_PIPELINE_ID}/ && zip -r ${CI_PIPELINE_ID}.zip web
+    - ssh ${REMOTE} "test -d ${BACKUP_DOCUMENT} || mkdir -p ${BACKUP_DOCUMENT}"
+    - scp /tmp/${CI_PROJECT_NAME}/${CI_PIPELINE_ID}/${CI_PIPELINE_ID}.zip ${REMOTE}:${BACKUP_DOCUMENT}/${CI_PIPELINE_ID}.zip
+    - echo '文件已上传，准备校验完整性......'
+
+check:
+  stage: check
+  only:
+    - online
+  script:
+    - echo '正在对上传文件进行完整性校验......'
+    - MD5_LOCAL=$( md5sum /tmp/${CI_PROJECT_NAME}/${CI_PIPELINE_ID}/${CI_PIPELINE_ID}.zip | awk '{print $1}' )
+    - MD5_REMOTE=$( ssh ${REMOTE} "md5sum ${BACKUP_DOCUMENT}/${CI_PIPELINE_ID}.zip | awk '{print \$1}' " )
+    - test ${MD5_REMOTE} = ${MD5_LOCAL} || echo "transfer failed"
+    - echo '校验完毕，传输内容无误，等待解压......'
+    - rm -rf /tmp/${CI_PROJECT_NAME}/${CI_PIPELINE_ID}
+
+decompress:
+  stage: decompress
+  only:
+    - online
+  script:
+    - ssh ${REMOTE} "cd ${BACKUP_DOCUMENT}/ && unzip -o ${CI_PIPELINE_ID}.zip && mv web ${CI_PIPELINE_ID}"
+    - echo '解压完毕，等待部署......'
+
+hijack_dns:
+  stage: hijack_dns
+  only:
+    - online
+  script:
+    - echo "执行本地dns劫持，你将访问到的是内网服务器上的页面"
+    - bash /opt/gitlab/runner/script/dns.sh ${DOMAIN} hijack
+
+deploy:
+  stage: deploy
+  environment:
+    name: ${CI_COMMIT_REF_NAME}
+    url: https://${DOMAIN}
+  only:
+    - online
+  script:
+    - ssh ${REMOTE} "ln -sfn ${BACKUP_DOCUMENT}/${CI_PIPELINE_ID} ${BACKUP_DOCUMENT}/current-tmp-${CI_PIPELINE_ID}"
+    - ssh ${REMOTE} "mv -fT ${BACKUP_DOCUMENT}/current-tmp-${CI_PIPELINE_ID} ${DEPLOY_DOCUMENT}"
+    - echo "本次部署路径为 ${DEPLOY_DOCUMENT} ---> ${BACKUP_DOCUMENT}/${CI_PIPELINE_ID}"
+    - echo "已经部署完毕，将进行收尾工作......"
+    - ssh ${REMOTE} "cd ${BACKUP_DOCUMENT}/ && rm -f ${CI_PIPELINE_ID}.zip && ls -t . | tail -n +31 | xargs rm -rf"
+  when: manual
+
+release_dns:
+  stage: release_dns
+  only:
+    - online
+  script:
+    - echo '解除本地dns劫持'
+    - bash /opt/gitlab/runner/script/dns.sh ${DOMAIN} release
+  when: manual

@@ -1,0 +1,1 @@
+{"type":"View","props":{"width":525,"top":-23,"height":54},"compId":2,"child":[{"type":"Sprite","props":{"y":0,"x":0,"texture":"game/backprogress.png"},"compId":7,"child":[{"type":"Sprite","props":{"y":-25,"x":18,"texture":"game/barprogress.png"},"compId":6}]}],"loadList":["game/backprogress.png","game/barprogress.png"],"loadList3D":[]}
